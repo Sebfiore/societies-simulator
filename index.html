@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Evolution Scenarios – Grid Sandbox (Unified Pressure)</title>
+<style>
+  :root {
+    --bg: #0f0f12;
+    --panel: #17171c;
+    --text: #e9e9ef;
+    --muted: #a8a8b3;
+    --accent: #6ea8fe;
+    --border: #2a2a32;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif;
+  }
+  header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: linear-gradient(180deg, #121216, #0f0f12);
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .2px; }
+  .wrap { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 16px; }
+  @media (max-width: 980px) { .wrap { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px; position: sticky; top: 14px;
+  }
+  .panel h2 { margin: 4px 0 10px; font-size: 14px; color: var(--muted); }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; margin: 8px 0; }
+  .controls { display: grid; gap: 10px; }
+  .btn {
+    background: #22222b; border: 1px solid var(--border); color: var(--text);
+    padding: 9px 12px; border-radius: 8px; cursor: pointer; font-weight: 600;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn.secondary { background: #191920; color: var(--muted); }
+  .btn.danger { background: #2a1b1b; border-color: #3a2222; }
+  .inline { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 8px 0 2px; }
+  .swatch {
+    height: 28px; border-radius: 6px; border: 2px solid transparent; cursor: pointer;
+    display: grid; place-items: center; font-size: 11px; color: #000; font-weight: 700;
+  }
+  .swatch[data-selected="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
+  label { font-size: 12px; color: var(--muted); }
+  input[type="range"] { width: 100%; }
+  input[type="number"] { width: 90px; background: #17171c; border: 1px solid var(--border); color: var(--text); padding: 6px 8px; border-radius: 6px; }
+  select {
+    width: 100%; background: #17171c; border: 1px solid var(--border);
+    color: var(--text); padding: 6px 8px; border-radius: 6px;
+  }
+  .stats { font-size: 12px; color: var(--muted); margin-top: 10px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .canvas-wrap {
+    background: #0b0b0e; border: 1px solid var(--border); border-radius: 10px;
+    height: calc(100dvh - 80px); display: grid; place-items: center; padding: 8px;
+  }
+  canvas { image-rendering: pixelated; background: #0b0b0e; border-radius: 6px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .meter { font-size: 12px; color: var(--muted); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 12px; color: var(--muted); }
+  .chart {
+    width: 100%; height: 120px; background: #121218; border: 1px solid var(--border); border-radius: 8px;
+    display: grid; place-items: center; margin-top: 6px;
+  }
+  .mini { font-size: 11px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+  .legend { display: flex; gap: 8px; align-items: center; }
+  .dot { width: 10px; height: 10px; border-radius: 2px; background: #666; display: inline-block; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Evolution Scenarios – Grid Sandbox</h1>
+    <div class="stats" id="hdrStats"></div>
+  </header>
+
+  <div class="wrap">
+    <aside class="panel">
+      <h2>Setup</h2>
+      <div class="row">
+        <label>Preset</label>
+        <select id="preset">
+          <option value="civic">Civic Cohesion (stable communities)</option>
+          <option value="wars">Territory Wars (borders & clashes)</option>
+          <option value="schelling">Schelling-ish (segregation dynamics)</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <label>Grid (WxH)</label>
+        <div class="inline">
+          <input id="gridW" type="number" min="10" max="300" step="1" value="100" />
+          <input id="gridH" type="number" min="10" max="300" step="1" value="70" />
+          <button class="btn secondary" id="applySize">Apply</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <label>Cell size (px)</label>
+        <input id="cellSize" type="number" min="4" max="24" step="1" value="8" />
+      </div>
+
+      <h2>Communities</h2>
+      <div id="swatches" class="swatches"></div>
+      <div class="inline">
+        <button class="btn secondary" id="randomSeed">Random seed</button>
+        <button class="btn secondary" id="clear">Clear</button>
+      </div>
+
+      <h2>Evolution Politics</h2>
+      <div class="row">
+        <label>Conflict pressure</label>
+        <input type="range" id="pressure" min="0" max="1" step="0.01" value="0.6" />
+      </div>
+      <div class="kv" id="derived">
+        <div>Derived tolerance</div><div id="valTolerance">—</div>
+        <div>Derived aggression</div><div id="valAggression">—</div>
+      </div>
+
+      <div class="row">
+        <label>Expansion bias</label>
+        <input type="range" id="expansion" min="0" max="1" step="0.01" value="0.6" />
+      </div>
+      <div class="row">
+        <label>Cohesion threshold</label>
+        <input type="range" id="cohesion" min="0" max="8" step="1" value="2" />
+      </div>
+      <div class="row">
+        <label>Churn (random)</label>
+        <input type="range" id="churn" min="0" max="0.2" step="0.001" value="0.01" />
+      </div>
+
+      <h2>Run</h2>
+      <div class="inline">
+        <button class="btn" id="startStop">Start</button>
+        <button class="btn secondary" id="step">Step</button>
+        <button class="btn danger" id="reset">Reset</button>
+      </div>
+      <div class="row">
+        <label>Speed (ms / tick)</label>
+        <input type="range" id="speed" min="10" max="400" step="5" value="80" />
+      </div>
+
+      <h2>Feedback</h2>
+      <div class="kv">
+        <div>Occupied</div><div id="kvOccupied">0</div>
+        <div>Communities</div><div id="kvCommunities">0</div>
+        <div>Diversity (H')</div><div id="kvDiversity">0.00</div>
+        <div>Boundary length</div><div id="kvBoundary">0</div>
+      </div>
+
+      <div class="mini" id="legend"></div>
+      <div class="chart"><canvas id="chartTerritory" width="300" height="120"></canvas></div>
+      <div class="mini">Territory by color (cells)</div>
+      <div class="chart"><canvas id="chartEvents" width="300" height="120"></canvas></div>
+      <div class="mini">Events per tick: colonize / conflict / pressure / decay / churn</div>
+
+      <div class="stats" id="stats"></div>
+      <div class="hint">Tip: drag to paint. Click a painted cell with the same color to erase it.</div>
+    </aside>
+
+    <main class="canvas-wrap">
+      <canvas id="grid"></canvas>
+    </main>
+  </div>
+
+<script>
+(() => {
+  // ---------- Config ----------
+  const COLORS = ["#e74c3c","#3498db","#2ecc71","#f1c40f","#9b59b6","#e67e22"];
+  const EMPTY = -1;
+  const HISTORY = 240; // points kept for sparklines
+
+  // ---------- State ----------
+  let gridW = 100, gridH = 70, cellSize = 8;
+  let grid = new Int16Array(gridW * gridH).fill(EMPTY);
+  let nextGrid = new Int16Array(gridW * gridH).fill(EMPTY);
+  let running = false, interval = null, tick = 0;
+  let selectedColor = 0;
+  let dragging = false, eraseMode = false;
+
+  // Parameters (note: tolerance & aggression derived from pressure)
+  const params = { pressure: 0.6, expansion: 0.6, cohesion: 2, churn: 0.01 };
+
+  // Stats history
+  const territoryHist = Array(COLORS.length).fill(0).map(() => []);
+  const eventHist = { colonize: [], conflict: [], pressureFlip: [], decay: [], churn: [] };
+
+  // ---------- DOM ----------
+  const cvs = document.getElementById("grid");
+  const swatchesEl = document.getElementById("swatches");
+  const startStopBtn = document.getElementById("startStop");
+  const stepBtn = document.getElementById("step");
+  const resetBtn = document.getElementById("reset");
+  const clearBtn = document.getElementById("clear");
+  const randomSeedBtn = document.getElementById("randomSeed");
+  const gridWEl = document.getElementById("gridW");
+  const gridHEl = document.getElementById("gridH");
+  const cellSizeEl = document.getElementById("cellSize");
+  const applySizeBtn = document.getElementById("applySize");
+  const presetEl = document.getElementById("preset");
+  const statEl = document.getElementById("stats");
+  const hdrStatEl = document.getElementById("hdrStats");
+  const legendEl = document.getElementById("legend");
+  const kvOccupied = document.getElementById("kvOccupied");
+  const kvCommunities = document.getElementById("kvCommunities");
+  const kvDiversity = document.getElementById("kvDiversity");
+  const kvBoundary = document.getElementById("kvBoundary");
+  const valTol = document.getElementById("valTolerance");
+  const valAgg = document.getElementById("valAggression");
+  const ui = {
+    pressure: document.getElementById("pressure"),
+    expansion: document.getElementById("expansion"),
+    cohesion: document.getElementById("cohesion"),
+    churn: document.getElementById("churn"),
+    speed: document.getElementById("speed"),
+  };
+  const ctx = cvs.getContext("2d");
+  const chartT = document.getElementById("chartTerritory").getContext("2d");
+  const chartE = document.getElementById("chartEvents").getContext("2d");
+
+  // ---------- Helpers ----------
+  const idx = (x, y) => y * gridW + x;
+  const inBounds = (x, y) => x >= 0 && y >= 0 && x < gridW && y < gridH;
+
+  function deriveParams(pressure) {
+    // 0..1 → useful ranges
+    const tolerance = 0.20 + 0.70 * pressure; // 0.20..0.90 (higher = needs more same neighbors)
+    const aggression = 0.40 + 1.60 * pressure; // 0.40..2.00
+    return { tolerance, aggression };
+  }
+
+  function fmt(n, d=2) { return Number(n).toFixed(d); }
+
+  function resizeCanvas() {
+    cvs.width = gridW * cellSize;
+    cvs.height = gridH * cellSize;
+    draw();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    for (let y = 0; y < gridH; y++) {
+      for (let x = 0; x < gridW; x++) {
+        const v = grid[idx(x,y)];
+        ctx.fillStyle = (v !== EMPTY) ? COLORS[v] : "#0b0b0e";
+        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+      }
+    }
+    statEl.textContent = `Tick: ${tick} • Occupied: ${occupiedCount()} • Grid: ${gridW}×${gridH}`;
+    hdrStatEl.textContent = `Tick ${tick} — Communities active: ${communityCount()}`;
+  }
+
+  function occupiedCount() { let c=0; for (let i=0;i<grid.length;i++) if (grid[i]!==EMPTY) c++; return c; }
+  function communityCount() { const s=new Set(); for (let i=0;i<grid.length;i++) if (grid[i]!==EMPTY) s.add(grid[i]); return s.size; }
+
+  function neighbors(x, y) {
+    const counts = new Int8Array(COLORS.length);
+    let empty = 0, total = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = x + dx, ny = y + dy;
+      if (!inBounds(nx, ny)) continue;
+      const v = grid[idx(nx, ny)];
+      if (v === EMPTY) empty++; else counts[v]++;
+      total++;
+    }
+    return { counts, empty, total };
+  }
+
+  function boundaryLength() {
+    let edges = 0;
+    for (let y=0; y<gridH; y++) {
+      for (let x=0; x<gridW; x++) {
+        const a = grid[idx(x,y)];
+        if (x+1<gridW) { const b = grid[idx(x+1,y)]; if (a!==b) edges++; }
+        if (y+1<gridH) { const c = grid[idx(x,y+1)]; if (a!==c) edges++; }
+      }
+    }
+    return edges;
+  }
+
+  function shannonDiversity(counts) {
+    const total = counts.reduce((a,b)=>a+b,0);
+    if (total===0) return 0;
+    let H = 0, k = 0;
+    for (const v of counts) {
+      if (v>0) { const p=v/total; H -= p * Math.log(p); k++; }
+    }
+    // Normalize by ln(k) to get 0..1 when multiple colors present
+    return (k>1) ? (H / Math.log(k)) : 0;
+  }
+
+  // ---------- Charts ----------
+  function drawLines(ctx, series, maxY, colors) {
+    const W = ctx.canvas.width, H = ctx.canvas.height;
+    ctx.clearRect(0,0,W,H);
+    // gridline
+    ctx.globalAlpha = 0.2;
+    ctx.beginPath(); ctx.moveTo(0,H-0.5); ctx.lineTo(W,H-0.5); ctx.strokeStyle="#444"; ctx.stroke();
+    ctx.globalAlpha = 1;
+    series.forEach((arr, si) => {
+      if (arr.length<2) return;
+      ctx.beginPath();
+      const n = arr.length;
+      for (let i=0;i<n;i++) {
+        const x = (i/(HISTORY-1)) * (W-6) + 3;
+        const y = H - 3 - (arr[i]/(maxY||1))*(H-6);
+        (i===0) ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      }
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = colors[si] || "#888";
+      ctx.stroke();
+    });
+  }
+
+  function pushHist(arr, v) { arr.push(v); if (arr.length>HISTORY) arr.shift(); }
+
+  function updateCharts(territoryCounts, eventsCounts) {
+    const totalCells = gridW*gridH;
+    // Territory
+    for (let c=0;c<COLORS.length;c++) pushHist(territoryHist[c], territoryCounts[c] || 0);
+    drawLines(chartT, territoryHist, totalCells, COLORS);
+
+    // Events
+    pushHist(eventHist.colonize, eventsCounts.colonize);
+    pushHist(eventHist.conflict, eventsCounts.conflict);
+    pushHist(eventHist.pressureFlip, eventsCounts.pressureFlip);
+    pushHist(eventHist.decay, eventsCounts.decay);
+    pushHist(eventHist.churn, eventsCounts.churn);
+
+    const maxE = Math.max(
+      10,
+      ...["colonize","conflict","pressureFlip","decay","churn"].map(k => Math.max(...eventHist[k], 0))
+    );
+    drawLines(
+      chartE,
+      [eventHist.colonize, eventHist.conflict, eventHist.pressureFlip, eventHist.decay, eventHist.churn],
+      maxE,
+      ["#9bd67d","#ff6b6b","#ffd166","#89a1ff","#aaaaaa"]
+    );
+  }
+
+  // ---------- Presets (mapped to pressure) ----------
+  function applyPresets(name) {
+    if (name === "civic") {
+      params.pressure = 0.45; params.expansion = 0.55; params.cohesion = 3; params.churn = 0.005;
+    } else if (name === "wars") {
+      params.pressure = 0.80; params.expansion = 0.80; params.cohesion = 1; params.churn = 0.01;
+    } else if (name === "schelling") {
+      params.pressure = 0.70; params.expansion = 0.50; params.cohesion = 2; params.churn = 0.02;
+    }
+    if (name !== "custom") {
+      ui.pressure.value = params.pressure;
+      ui.expansion.value = params.expansion;
+      ui.cohesion.value = params.cohesion;
+      ui.churn.value = params.churn;
+      updateDerivedLabels();
+    }
+  }
+
+  function updateDerivedLabels() {
+    const { tolerance, aggression } = deriveParams(params.pressure);
+    valTol.textContent = `${fmt(tolerance,2)} (needs ≥ this like-neighbor fraction)`;
+    valAgg.textContent = `${fmt(aggression,2)} (conflict intensity & resistance)`;
+  }
+
+  // ---------- Step ----------
+  function step() {
+    const { tolerance, aggression } = deriveParams(params.pressure);
+    const events = { colonize:0, conflict:0, pressureFlip:0, decay:0, churn:0 };
+
+    for (let y = 0; y < gridH; y++) {
+      for (let x = 0; x < gridW; x++) {
+        const i = idx(x,y);
+        const v = grid[i];
+        const { counts, total } = neighbors(x,y);
+
+        let out = v;
+        let cause = null;
+
+        if (v === EMPTY) {
+          // Colonization by locally strongest color
+          let maxC = -1, maxCol = -1;
+          for (let c = 0; c < counts.length; c++) if (counts[c] > maxC) { maxC = counts[c]; maxCol = c; }
+          if (maxC > 0) {
+            const p = params.expansion * (maxC / Math.max(1,total));
+            if (Math.random() < p) { out = maxCol; cause = "colonize"; }
+            else out = EMPTY;
+          } else out = EMPTY;
+        } else {
+          const self = v;
+          const same = counts[self];
+          let maxOther = 0, maxOtherCol = -1;
+          for (let c = 0; c < counts.length; c++) if (c !== self && counts[c] > maxOther) { maxOther = counts[c]; maxOtherCol = c; }
+          const neighborhood = same + maxOther;
+          const fracSame = neighborhood > 0 ? same / neighborhood : 1.0;
+
+          out = self;
+
+          // Isolation → decay to empty
+          if (same < params.cohesion) {
+            const pd = ((params.cohesion - same) / Math.max(1, params.cohesion)) * (0.5 + params.churn);
+            if (Math.random() < pd) { out = EMPTY; cause = "decay"; }
+          }
+
+          // Pressure (tolerance) → flip or empty
+          if (out === self && fracSame < tolerance) {
+            const pFlip = (tolerance - fracSame) * (0.6 + aggression * 0.2);
+            const pEmpty = (tolerance - fracSame) * (0.4 + params.churn);
+            if (maxOtherCol !== -1 && Math.random() < pFlip) { out = maxOtherCol; cause = "pressureFlip"; }
+            else if (Math.random() < pEmpty) { out = EMPTY; if(!cause) cause = "decay"; }
+          }
+
+          // Direct conflict: overwhelmed by rival
+          if (out === self && maxOther > 0 && maxOther > same * aggression) {
+            if (Math.random() < aggression * (maxOther / Math.max(1, neighborhood))) {
+              out = maxOtherCol; cause = "conflict";
+            }
+          }
+
+          // Random churn
+          if (Math.random() < params.churn * 0.25) {
+            if (Math.random() < 0.4) { out = EMPTY; cause = cause || "churn"; }
+          }
+        }
+
+        nextGrid[i] = out;
+        if (cause === "colonize") events.colonize++;
+        else if (cause === "conflict") events.conflict++;
+        else if (cause === "pressureFlip") events.pressureFlip++;
+        else if (cause === "decay") events.decay++;
+        else if (cause === "churn") events.churn++;
+      }
+    }
+
+    // Swap buffers
+    const tmp = grid; grid = nextGrid; nextGrid = tmp;
+    tick++;
+    draw();
+
+    // Metrics & charts
+    const tCounts = colorTerritories();
+    const H = shannonDiversity(tCounts);
+    const B = boundaryLength();
+    kvOccupied.textContent = tCounts.reduce((a,b)=>a+b,0);
+    kvCommunities.textContent = tCounts.filter(v=>v>0).length;
+    kvDiversity.textContent = fmt(H, 2);
+    kvBoundary.textContent = B;
+
+    updateCharts(tCounts, events);
+  }
+
+  function colorTerritories() {
+    const counts = new Array(COLORS.length).fill(0);
+    for (let i=0;i<grid.length;i++) if (grid[i]!==EMPTY) counts[grid[i]]++;
+    return counts;
+  }
+
+  // ---------- Painting ----------
+  function pickCellFromEvent(e) {
+    const rect = cvs.getBoundingClientRect();
+    const scaleX = cvs.width / rect.width;
+    const scaleY = cvs.height / rect.height;
+    const x = Math.floor((e.clientX - rect.left) * scaleX / cellSize);
+    const y = Math.floor((e.clientY - rect.top) * scaleY / cellSize);
+    if (!inBounds(x,y)) return null;
+    return { x, y, i: idx(x,y) };
+  }
+  function paintAt(e) {
+    const p = pickCellFromEvent(e);
+    if (!p) return;
+    const current = grid[p.i];
+    const target = eraseMode ? EMPTY : selectedColor;
+    if (current !== target) { grid[p.i] = target; draw(); }
+  }
+  cvs.addEventListener("mousedown", (e) => {
+    dragging = true;
+    const p = pickCellFromEvent(e);
+    if (!p) return;
+    eraseMode = grid[p.i] === selectedColor; // clicking same color toggles erase
+    paintAt(e);
+  });
+  window.addEventListener("mousemove", (e) => { if (dragging) paintAt(e); });
+  window.addEventListener("mouseup", () => dragging = false);
+  cvs.addEventListener("mouseleave", () => dragging = false);
+
+  // ---------- UI Wiring ----------
+  function renderSwatches() {
+    swatchesEl.innerHTML = "";
+    legendEl.innerHTML = "";
+    COLORS.forEach((col, i) => {
+      const d = document.createElement("button");
+      d.className = "swatch";
+      d.style.background = col;
+      d.dataset.selected = i === selectedColor ? "true" : "false";
+      d.title = `Community ${i+1}`;
+      d.textContent = i+1;
+      d.addEventListener("click", () => {
+        selectedColor = i;
+        [...swatchesEl.children].forEach(c => c.dataset.selected = "false");
+        d.dataset.selected = "true";
+      });
+      swatchesEl.appendChild(d);
+
+      // legend
+      const lg = document.createElement("div");
+      lg.className = "legend";
+      const dot = document.createElement("span"); dot.className="dot"; dot.style.background=col;
+      const txt = document.createElement("span"); txt.textContent = `C${i+1}`;
+      lg.appendChild(dot); lg.appendChild(txt);
+      legendEl.appendChild(lg);
+    });
+  }
+
+  presetEl.addEventListener("change", () => {
+    const val = presetEl.value;
+    if (val !== "custom") applyPresets(val);
+  });
+
+  ui.pressure.addEventListener("input", e => { params.pressure = parseFloat(e.target.value); presetEl.value = "custom"; updateDerivedLabels(); });
+  ui.expansion.addEventListener("input", e => { params.expansion = parseFloat(e.target.value); presetEl.value = "custom"; });
+  ui.cohesion.addEventListener("input", e => { params.cohesion = parseInt(e.target.value,10); presetEl.value = "custom"; });
+  ui.churn.addEventListener("input", e => { params.churn = parseFloat(e.target.value); presetEl.value = "custom"; });
+
+  startStopBtn.addEventListener("click", () => { running ? stop() : start(); });
+  stepBtn.addEventListener("click", () => { if (running) stop(); step(); });
+  resetBtn.addEventListener("click", () => { stop(); tick = 0; grid.fill(EMPTY); clearHistory(); draw(); });
+  clearBtn.addEventListener("click", () => { grid.fill(EMPTY); draw(); });
+  randomSeedBtn.addEventListener("click", () => {
+    const blobs = Math.max(6, Math.floor((gridW*gridH) / 800));
+    for (let c = 0; c < COLORS.length; c++) {
+      for (let b = 0; b < blobs; b++) {
+        const cx = Math.floor(Math.random() * gridW);
+        const cy = Math.floor(Math.random() * gridH);
+        const r = 2 + Math.floor(Math.random() * 5);
+        for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
+          const nx = cx + x, ny = cy + y; if (!inBounds(nx,ny)) continue;
+          if (x*x + y*y <= r*r && Math.random() < 0.75) grid[idx(nx,ny)] = c;
+        }
+      }
+    }
+    draw();
+  });
+
+  applySizeBtn.addEventListener("click", () => {
+    const w = Math.max(10, Math.min(300, parseInt(gridWEl.value, 10) || gridW));
+    const h = Math.max(10, Math.min(300, parseInt(gridHEl.value, 10) || gridH));
+    const cs = Math.max(4, Math.min(24, parseInt(cellSizeEl.value, 10) || cellSize));
+    rebuildGrid(w, h, cs);
+  });
+
+  function rebuildGrid(w, h, cs) {
+    stop();
+    gridW = w; gridH = h; cellSize = cs;
+    grid = new Int16Array(gridW * gridH).fill(EMPTY);
+    nextGrid = new Int16Array(gridW * gridH).fill(EMPTY);
+    tick = 0;
+    clearHistory();
+    resizeCanvas();
+    draw();
+  }
+
+  function start() {
+    if (running) return;
+    running = true;
+    startStopBtn.textContent = "Pause";
+    const loop = () => { step(); };
+    const speed = parseInt(ui.speed.value, 10);
+    interval = setInterval(loop, speed);
+  }
+  function stop() {
+    running = false;
+    startStopBtn.textContent = "Start";
+    if (interval) { clearInterval(interval); interval = null; }
+  }
+
+  ui.speed.addEventListener("input", () => { if (running) { stop(); start(); } });
+
+  function clearHistory() {
+    for (let c=0;c<COLORS.length;c++) territoryHist[c].length = 0;
+    for (const k in eventHist) eventHist[k].length = 0;
+    chartT.clearRect(0,0,chartT.canvas.width,chartT.canvas.height);
+    chartE.clearRect(0,0,chartE.canvas.width,chartE.canvas.height);
+  }
+
+  // ---------- Boot ----------
+  renderSwatches();
+  applyPresets("civic"); // default
+  resizeCanvas();
+  updateDerivedLabels();
+  draw();
+})();
+</script>
+</body>
+</html>
